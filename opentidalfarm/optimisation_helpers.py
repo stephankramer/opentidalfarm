@@ -174,7 +174,7 @@ class MinimumDistanceConstraints(InequalityConstraint):
             http://www.dolfin-adjoint.org/en/latest/documentation/api.html#dolfin_adjoint.InequalityConstraint
 
     """
-    def __init__(self, turbine_positions, minimum_distance, controls):
+    def __init__(self, turbine_positions, minimum_distance, number_of_thrust_controls):
         """Create MinimumDistanceConstraints
 
         :param serialized_turbines: The serialized turbine paramaterisation.
@@ -192,7 +192,7 @@ class MinimumDistanceConstraints(InequalityConstraint):
 
         self._turbines = numpy.asarray(turbine_positions).flatten().tolist()
         self._minimum_distance = minimum_distance
-        self._controls = controls
+        self._number_of_thrust_controls = number_of_thrust_controls
 
 
     def _sl2norm(self, x):
@@ -202,13 +202,7 @@ class MinimumDistanceConstraints(InequalityConstraint):
 
     def length(self):
         """Returns the number of constraints ``len(function(m))``."""
-        n_constraints = 0
-        for i in range(len(self._turbines)):
-          for j in range(len(self._turbines)):
-            if i <= j:
-              continue
-            n_constraints += 1
-        return n_constraints
+        return len(self._turbines) * (len(self._turbines)-1) / 2
 
 
     def function(self, m):
@@ -222,12 +216,16 @@ class MinimumDistanceConstraints(InequalityConstraint):
         """
         dolfin.log(dolfin.PROGRESS, "Calculating minimum distance constraints.")
         inequality_constraints = []
-        for i in range(len(m)/2):
-            for j in range(len(m)/2):
+
+        # skip controls associated with variable thrust
+        xy = m[self._number_of_thrust_controls:]
+
+        for i in range(len(xy)/2):
+            for j in range(len(xy)/2):
                 if i <= j:
                     continue
-                inequality_constraints.append(self._sl2norm([m[2*i]-m[2*j],
-                                                             m[2*i+1]-m[2*j+1]])
+                inequality_constraints.append(self._sl2norm([xy[2*i]-xy[2*j],
+                                                             xy[2*i+1]-xy[2*j+1]])
                                               - self._minimum_distance**2)
 
         inequality_constraints = numpy.array(inequality_constraints)
@@ -254,28 +252,23 @@ class MinimumDistanceConstraints(InequalityConstraint):
                    "distance constraints function.")
         inequality_constraints = []
 
-        for i in range(len(m)/2):
-            for j in range(len(m)/2):
+        # skip controls associated with variable thrust
+        xy = m[self._number_of_thrust_controls:]
+
+        for i in range(len(xy)/2):
+            for j in range(len(xy)/2):
                 if i <= j:
                     continue
 
-                # Need to add space for zeros for the friction
-                if self._controls.position and self._controls.friction:
-                    prime_inequality_constraints = numpy.zeros(len(m)*3/2)
-                    friction_length = len(m)/2
-                else:
-                    prime_inequality_constraints = numpy.zeros(len(m))
-                    friction_length = 0
-
                 # Provide a shorter handle
-                p_ineq_c = prime_inequality_constraints
+                p_ineq_c = numpy.zeros_like(m)
 
                 # The control vector contains the friction coefficients first,
                 # so we need to shift here
-                p_ineq_c[friction_length+2*i] = 2*(m[2*i] - m[2*j])
-                p_ineq_c[friction_length+2*j] = -2*(m[2*i] - m[2*j])
-                p_ineq_c[friction_length+2*i+1] = 2*(m[2*i+1] - m[2*j+1])
-                p_ineq_c[friction_length+2*j+1] = -2*(m[2*i+1] - m[2*j+1])
+                p_ineq_c[self._number_of_thrust_controls+2*i] = 2*(xy[2*i] - xy[2*j])
+                p_ineq_c[self._number_of_thrust_controls+2*j] = -2*(xy[2*i] - xy[2*j])
+                p_ineq_c[self._number_of_thrust_controls+2*i+1] = 2*(xy[2*i+1] - xy[2*j+1])
+                p_ineq_c[self._number_of_thrust_controls+2*j+1] = -2*(xy[2*i+1] - xy[2*j+1])
                 inequality_constraints.append(p_ineq_c)
 
         return numpy.array(inequality_constraints)
@@ -307,7 +300,7 @@ class MinimumDistanceConstraintsLargeArrays(InequalityConstraint):
             http://www.dolfin-adjoint.org/en/latest/documentation/api.html#dolfin_adjoint.InequalityConstraint
 
     """
-    def __init__(self, turbine_positions, minimum_distance, controls):
+    def __init__(self, turbine_positions, minimum_distance, number_of_thrust_controls):
         """Create MinimumDistanceConstraints
 
         :param serialized_turbines: The serialized turbine paramaterisation.
@@ -325,7 +318,7 @@ class MinimumDistanceConstraintsLargeArrays(InequalityConstraint):
 
         self._turbines = numpy.asarray(turbine_positions).flatten().tolist()
         self._minimum_distance = minimum_distance
-        self._controls = controls
+        self._number_of_thrust_controls = number_of_thrust_controls
 
 
     def _sl2norm(self, x):
@@ -361,17 +354,15 @@ class MinimumDistanceConstraintsLargeArrays(InequalityConstraint):
         """
         dolfin.log(dolfin.PROGRESS, "Calculating minimum distance constraints.")
 
-        if self._controls.position and self._controls.friction:
-            friction_length = len(m)/3
-            m = m[friction_length:]
+        xy = m[self._number_of_thrust_controls:]
 
         value = 0
-        for i in range(len(m)/2):
-            for j in range(len(m)/2):
+        for i in range(len(xy)/2):
+            for j in range(len(xy)/2):
                 if i <= j:
                     continue
-                dist_sq = self._sl2norm([m[2*i]-m[2*j],
-                                         m[2*i+1]-m[2*j+1]])
+                dist_sq = self._sl2norm([xy[2*i]-xy[2*j],
+                                         xy[2*i+1]-xy[2*j+1]])
                 value += self._penalty(dist_sq)
 
         if value <= 0:
@@ -397,29 +388,25 @@ class MinimumDistanceConstraintsLargeArrays(InequalityConstraint):
                    "distance constraints function.")
         inequality_constraints = []
 
-        if self._controls.position and self._controls.friction:
-            friction_length = len(m)/3
-            m = m[friction_length:]
-        else:
-            friction_length = 0
+        xy = m[self._number_of_thrust_controls:]
 
-        p_ineq_c = numpy.zeros(friction_length + len(m))
+        p_ineq_c = numpy.zeros_like(m)
 
-        for i in range(len(m)/2):
-            for j in range(len(m)/2):
+        for i in range(len(xy)/2):
+            for j in range(len(xy)/2):
                 if i <= j:
                     continue
 
-                dist_sq = self._sl2norm([m[2*i]-m[2*j],
-                                         m[2*i+1]-m[2*j+1]])
+                dist_sq = self._sl2norm([xy[2*i]-xy[2*j],
+                                         xy[2*i+1]-xy[2*j+1]])
                 dvalue = self._dpenalty(dist_sq)
 
                 # The control vector contains the friction coefficients first,
                 # so we need to shift here
-                p_ineq_c[friction_length+2*i] += dvalue * 2*(m[2*i] - m[2*j])
-                p_ineq_c[friction_length+2*j] += dvalue * (-2*(m[2*i] - m[2*j]))
-                p_ineq_c[friction_length+2*i+1] += dvalue * 2*(m[2*i+1] - m[2*j+1])
-                p_ineq_c[friction_length+2*j+1] += dvalue * (-2*(m[2*i+1] - m[2*j+1]))
+                p_ineq_c[self._number_of_thrust_controls+2*i] += dvalue * 2*(xy[2*i] - xy[2*j])
+                p_ineq_c[self._number_of_thrust_controls+2*j] += dvalue * (-2*(xy[2*i] - xy[2*j]))
+                p_ineq_c[self._number_of_thrust_controls+2*i+1] += dvalue * 2*(xy[2*i+1] - xy[2*j+1])
+                p_ineq_c[self._number_of_thrust_controls+2*j+1] += dvalue * (-2*(xy[2*i+1] - xy[2*j+1]))
 
         return numpy.array([p_ineq_c])
 
@@ -466,8 +453,7 @@ class ConvexPolygonSiteConstraint(InequalityConstraint):
     def function(self, m):
         ieqcons = []
         controlled_by = self.farm.turbine_specification.controls
-        if (controlled_by.position and
-            (controlled_by.friction or controlled_by.dynamic_friction)):
+        if self.farm._variable_positions and self.farm._variable_thrust:
         # If the controls consists of the the friction and the positions, then we need to first extract the position part
             assert(len(m) % 3 == 0)
             m_pos = m[len(m) / 3:]
@@ -486,9 +472,7 @@ class ConvexPolygonSiteConstraint(InequalityConstraint):
 
     def jacobian(self, m):
         ieqcons = []
-        controlled_by = self.farm.turbine_specification.controls
-        if (controlled_by.position and
-            (controlled_by.friction or controlled_by.dynamic_friction)):
+        if self.farm._variable_positions and self.farm._variable_thrust:
             # If the controls consists of the the friction and the positions, then we need to first extract the position part
             assert(len(m) % 3 == 0)
             m_pos = m[len(m) / 3:]

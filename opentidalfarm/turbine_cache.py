@@ -48,65 +48,51 @@ class TurbineCache(dict):
             raise ValueError("The turbine specification has not yet been set.")
 
         position = farm._parameters["position"]
-        friction = farm._parameters["friction"]
+        density = farm._parameters["density"]
 
         # If the parameters have not changed, there is nothing to do
         if self._parameters is not None:
-            if (len(self._parameters["friction"])==len(friction) and
+            if (len(self._parameters["density"])==len(density) and
                 len(self._parameters["position"])==len(position) and
-                (self._parameters["friction"]==friction).all() and
+                (self._parameters["density"]==density).all() and
                 (self._parameters["position"]==position).all()):
                 return
 
         else:
-            self._parameters = {"friction": [], "position": []}
+            self._parameters = {"density": [], "position": []}
 
         # Update the cache.
         log(INFO, "Updating the turbine cache")
 
         # Update the positions and frictions.
-        self._parameters["friction"] = numpy.copy(friction)
+        self._parameters["density"] = numpy.copy(density)
         self._parameters["position"] = numpy.copy(position)
 
         # For the smeared approached we just update the turbine_field.
         if self._specification.smeared:
             if hasattr(self, "turbine_field"):
                 return
-            tf = Function(self._function_space, name="turbine_friction_cache")
+            tf = Function(self._function_space, name="turbine_density_cache")
             # FIXME: This if statement is only required to handle the case where
-            # self._parameters["friction"] is not initialised yet.
-            if len(self._parameters["friction"]) > 0:
-                tf.vector()[:] = self._parameters["friction"]
+            # self._parameters["density"] is not initialised yet.
+            if len(self._parameters["density"]) > 0:
+                tf.vector()[:] = self._parameters["density"]
             self["turbine_field"] = tf
             return
 
 
-        # Precompute the interpolation of the friction function of all turbines.
+        # Precompute the interpolation of the density function of all turbines.
         turbines = TurbineFunction(self, self._function_space,
                                    self._specification)
 
-        # If the turbine friction is controlled dynamically, we need to cache
-        # the turbine field for every timestep.
-        if self._controlled_by.dynamic_friction:
-            self["turbine_field"] = [
-                turbines(name="turbine_friction_cache_t_"+str(t),
-                timestep=t) for t in xrange(len(self._parameters["friction"]))
-                ]
-        else:
-            self["turbine_field"] = turbines(name="turbine_friction_cache")
+        self["turbine_field"] = turbines(name="turbine_friction_cache")
 
         # Precompute the interpolation of the friction function for each turbine.
         log(INFO, "Building individual turbine power friction functions "
                   "for caching purposes...")
-        if self._controlled_by.dynamic_friction:
-            self["turbine_field_individual"] = [
-                    TurbineFunction(self, self._function_space,
-                        self._specification)(timestep=i)
-                    for i in xrange(len(self._parameters["friction"]))]
-        else:
-            self["turbine_field_individual"] = [
-                    TurbineFunction(self, self._function_space,
-                        self._specification)()]
+        self["turbine_field_individual"] = [
+                TurbineFunction(self, self._function_space,
+                    self._specification)()]
 
         # Precompute the derivatives with respect to the friction magnitude
         # of each turbine.

@@ -2,20 +2,20 @@ class Controls(object):
     """Specifies the controls for optimisation.
 
     This class holds the controls for optimisation, such as the position and the
-    friction of the turbines. The user initializes this class with their desired
+    density of the turbines. The user initializes this class with their desired
     control parameters.
     """
-    def __init__(self, position=False, friction=False, dynamic_friction=False):
+    def __init__(self, position=False, density=False, dynamic_thrust=False):
         """Initialize with the desired controls.
 
         :param bool position: Whether or not turbine position is a control.
-        :param bool friction: Whether or not turbine friction is a control.
-        :param bool dynamic_friction: Whether or not dynamic friction is a control.
+        :param bool density: Whether or not turbine density is a control.
+        :param bool dynamic_thrust: Whether or not dynamic thrust is a control.
         """
 
         self._controls = {"position": False,
-                          "friction": False,
-                          "dynamic_friction": False}
+                          "density": False,
+                          "dynamic_thrust": False}
 
         def _process(key, value):
             """Check value is of type bool. Raise ValueError if it is not."""
@@ -30,8 +30,8 @@ class Controls(object):
 
         # Process the given values
         _process("position", position)
-        _process("friction", friction)
-        _process("dynamic friction", dynamic_friction)
+        _process("density", density)
+        _process("dynamic thrust", dynamic_thrust)
 
 
     def __str__(self):
@@ -59,20 +59,20 @@ class Controls(object):
 
 
     @property
-    def friction(self):
-        """Whether friction is enabled as a control parameter.
+    def density(self):
+        """Whether density is enabled as a control parameter.
 
-        :returns: True if friction is enabled as a control parameter.
+        :returns: True if density is enabled as a control parameter.
         :rtype: bool
         """
-        return self._controls["friction"]
+        return self._controls["density"]
 
 
     @property
-    def dynamic_friction(self):
-        """Whether dynamic friction is enabled as a control parameter.
+    def dynamic_thrust(self):
+        """Whether dynamic thrust is enabled as a control parameter.
 
-        :returns: True if dynamic friction is enabled as a control parameter.
+        :returns: True if dynamic thrust is enabled as a control parameter.
         :rtype: bool
         """
-        return self._controls["dynamic friction"]
+        return self._controls["dynamic thrust"]

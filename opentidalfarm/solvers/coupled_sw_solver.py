@@ -382,17 +382,6 @@ class CoupledSWSolver(Solver):
 
         # Bottom friction
         friction = problem_params.friction
-        # Farm friction
-        if not farm:
-            tf = Constant(0)
-        elif type(farm.friction_function) == list:
-            tf = farm.friction_function[0].copy(deepcopy=True,
-                    name="turbine_friction", annotate=annotate)
-            tf.assign(theta*farm.friction_function[1]+(1.-float(theta))*\
-                      farm.friction_function[0], annotate=annotate)
-        else:
-            tf = farm.friction_function.copy(deepcopy=True,
-                                             name="turbine_friction", annotate=annotate)
         # FIXME: FEniCS fails on assembling the below form for u_mid = 0, even
         # though it is differentiable. Even this potential fix does not help:
         #norm_u_mid = conditional(inner(u_mid, u_mid)**0.5 < DOLFIN_EPS, Constant(0),
@@ -402,7 +391,7 @@ class CoupledSWSolver(Solver):
 
         if farm:
 
-            R_mid += inner(farm.force(u_mid, tf=tf), v)/H *farm.site_dx
+            R_mid += inner(farm.force(u_mid), v)/H *farm.site_dx
 
         # Advection term
         if include_advection:
